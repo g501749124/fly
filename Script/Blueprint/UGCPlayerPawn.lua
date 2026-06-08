@@ -9,7 +9,6 @@ function UGCPlayerPawn:ReceiveBeginPlay()
     UGCPlayerPawn.SuperClass.ReceiveBeginPlay(self)
 
     local isServer = UGCGameSystem.IsServer and UGCGameSystem.IsServer() or self:HasAuthority()
-    ugcprint(string.format("[SwordFly] Pawn BeginPlay isServer=%s", tostring(isServer)))
 
     local ok = pcall(function()
         self.PrimaryActorTick.bCanEverTick = true
@@ -18,9 +17,6 @@ function UGCPlayerPawn:ReceiveBeginPlay()
             self:SetActorTickEnabled(true)
         end
     end)
-    if ok then
-        ugcprint("[SwordFly] Pawn Tick Enabled")
-    end
 
     -- 输入只需要在客户端绑定；服务端通过 Toggle RPC 同步进入/退出御剑模式
     if not isServer then
