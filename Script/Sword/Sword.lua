@@ -1,4 +1,5 @@
 ---@class Sword_C:AActor
+---@field ParticleSystem UParticleSystemComponent
 ---@field StaticMesh UStaticMeshComponent
 --Edit Below--
 local Sword = {}

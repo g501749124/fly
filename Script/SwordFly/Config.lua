@@ -10,6 +10,10 @@ Config.BrakingDecelerationFlying = 1300
 Config.MaxAcceleration = 2200
 Config.EnterBlendTime = 0.22
 
+-- 进入御剑后的“起飞抬升”手感：按下 V 后自动向上轻抬一小段时间
+Config.EnterAutoLiftTime = 0.5
+Config.EnterAutoLiftAxis = 0.8
+
 -- 剑挂载到角色 Mesh 的相对偏移/旋转
 Config.MountOffset = { X = 35, Y = 0, Z = -88 }
 Config.MountRot = { Pitch = -12, Yaw = 90, Roll = 0 }
@@ -18,6 +22,6 @@ Config.MountRot = { Pitch = -12, Yaw = 90, Roll = 0 }
 Config.SwordClassPath = "Asset/Sword/Sword.Sword_C"
 
 -- 进入御剑时镜头拉远（SpringArm.TargetArmLength 增量）
-Config.CameraArmLengthDelta = 160
+Config.CameraArmLengthDelta = 260
 
 return Config
