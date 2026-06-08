@@ -32,110 +32,18 @@ local function _GetCM(pawn)
     return pawn and pawn.CharacterMovement or nil
 end
 
-local function _GetObjName(obj)
-    if obj == nil then
-        return "nil"
-    end
-    local ok, name = pcall(function()
-        if obj.GetName then
-            return obj:GetName()
-        end
-        if obj.GetFName then
-            return tostring(obj:GetFName())
-        end
-        return tostring(obj)
-    end)
-    if ok then
-        return tostring(name)
-    end
-    return tostring(obj)
-end
-
-local function _FindSpringArmByScan(pawn)
-    if pawn == nil or UE == nil or UE.LoadClass == nil then
-        return nil
-    end
-
-    local cls = nil
-    pcall(function()
-        cls = UE.LoadClass("/Script/Engine.SpringArmComponent")
-    end)
-    if cls == nil then
-        pcall(function()
-            cls = UE.LoadClass("Class'/Script/Engine.SpringArmComponent'")
-        end)
-    end
-    if cls == nil then
-        return nil
-    end
-
-    local function _PickFirst(comps)
-        if comps == nil then
-            return nil
-        end
-        if comps[1] ~= nil and _IsValid(comps[1]) then
-            return comps[1]
-        end
-        if comps[0] ~= nil and _IsValid(comps[0]) then
-            return comps[0]
-        end
-        return nil
-    end
-
-    if pawn.K2_GetComponentsByClass then
-        local ok, comps = pcall(function()
-            return pawn:K2_GetComponentsByClass(cls)
-        end)
-        if ok then
-            local arm = _PickFirst(comps)
-            if arm ~= nil then
-                return arm
-            end
-        end
-    end
-
-    if pawn.GetComponentsByClass then
-        local ok, comps = pcall(function()
-            return pawn:GetComponentsByClass(cls)
-        end)
-        if ok then
-            local arm = _PickFirst(comps)
-            if arm ~= nil then
-                return arm
-            end
-        end
-    end
-
-    return nil
-end
-
 local function _FindSpringArm(pawn)
     if pawn == nil then
         return nil
     end
-    local candidates = {
-        pawn.SpringArm,
-        pawn.CameraBoom,
-        pawn.CameraArm,
-        pawn.CameraSpringArm,
-        pawn.CustomSpringArm,
-        pawn.ShoulderCameraSpringArm,
-        pawn.ThirdPersonSpringArm,
-        pawn.TPSpringArm,
-        pawn.TPSpringArm0,
-        pawn.FollowCameraSpringArm,
-    }
-    for _, arm in ipairs(candidates) do
-        if _IsValid(arm) then
-            return arm
-        end
+    -- 当前项目实际生效的是 Pawn 上的 CustomSpringArm（SpringArmComponent）
+    -- 如果你在蓝图里改了相机结构，需要同步调整这里的字段名
+    if _IsValid(pawn.CustomSpringArm) then
+        return pawn.CustomSpringArm
     end
-
-    local scanned = _FindSpringArmByScan(pawn)
-    if _IsValid(scanned) then
-        return scanned
+    if _IsValid(pawn.SpringArm) then
+        return pawn.SpringArm
     end
-
     return nil
 end
 
@@ -145,7 +53,6 @@ local function _ApplyCameraEnter(pawn, state)
     end
     local arm = _FindSpringArm(pawn)
     if arm == nil or arm.TargetArmLength == nil then
-        ugcprint(string.format("[SwordFly] CameraEnter skipped: arm not found pawn=%s", _GetObjName(pawn)))
         return
     end
     state.cached.CameraArmLength = arm.TargetArmLength
@@ -153,7 +60,6 @@ local function _ApplyCameraEnter(pawn, state)
     if delta ~= 0 then
         arm.TargetArmLength = (tonumber(arm.TargetArmLength) or 0) + delta
     end
-    ugcprint(string.format("[SwordFly] CameraEnter arm=%s prop=TargetArmLength len=%s->%s", _GetObjName(arm), tostring(state.cached.CameraArmLength), tostring(arm.TargetArmLength)))
 end
 
 local function _ApplyCameraExit(pawn, state)
@@ -162,13 +68,11 @@ local function _ApplyCameraExit(pawn, state)
     end
     local arm = _FindSpringArm(pawn)
     if arm == nil or arm.TargetArmLength == nil then
-        ugcprint(string.format("[SwordFly] CameraExit skipped: arm not found pawn=%s", _GetObjName(pawn)))
         return
     end
     if state.cached.CameraArmLength ~= nil then
         arm.TargetArmLength = state.cached.CameraArmLength
     end
-    ugcprint(string.format("[SwordFly] CameraExit arm=%s prop=TargetArmLength len=%s", _GetObjName(arm), tostring(arm.TargetArmLength)))
 end
 
 local function _SetMovementMode(cm, mode)
@@ -313,8 +217,6 @@ function SwordFly.Enter(pawn)
     if pc and pc.ClientRPC_Tip then
         pc:ClientRPC_Tip("御剑飞行：开启")
     end
-
-    ugcprint("[SwordFly] Enter")
 end
 
 function SwordFly.Exit(pawn)
@@ -371,8 +273,6 @@ function SwordFly.Exit(pawn)
     if pc and pc.ClientRPC_Tip then
         pc:ClientRPC_Tip("御剑飞行：结束")
     end
-
-    ugcprint("[SwordFly] Exit")
 end
 
 function SwordFly.Toggle(pawn)

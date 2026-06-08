@@ -38,7 +38,6 @@ end
 
 function InputMgr:BindPlatformInput(PlayerPawn)
     if not _IsValid(PlayerPawn) then
-        ugcprint("[SwordFlyInput] BindPlatformInput failed: PlayerPawn invalid")
         return
     end
 
@@ -68,8 +67,6 @@ function InputMgr:BindPlatformInput(PlayerPawn)
     _Bind("downCanceled", tagDown, ETriggerEvent.Canceled, InputMgr.OnDownReleased)
 
     PlayerPawn.__SwordFlyInputHandles = handles
-
-    ugcprint(string.format("[SwordFlyInput] Bind OK toggle=%s up=%s down=%s", tostring(tagToggle), tostring(tagUp), tostring(tagDown)))
 end
 
 function InputMgr:ClearInput(PlayerPawn)
@@ -83,7 +80,6 @@ end
 function InputMgr.OnToggle(PlayerPawn, InputValue, ElapsedTime, TriggeredTime, InputTag)
     SwordFly.Toggle(PlayerPawn)
     _CallServerRPC(PlayerPawn, "Server_SwordFlyToggle")
-    ugcprint(string.format("[SwordFlyInput] Toggle value=%s tag=%s", tostring(InputValue), tostring(InputTag)))
 end
 
 function InputMgr.OnUpStarted(PlayerPawn, InputValue, ElapsedTime, TriggeredTime, InputTag)
