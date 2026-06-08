@@ -102,6 +102,74 @@ end
 
 local _UpVector = _NewVector(0, 0, 1)
 
+local function _ReadVec(v)
+    if v == nil then
+        return nil
+    end
+    local x = v.X
+    local y = v.Y
+    local z = v.Z
+    if x == nil and type(v) == "table" then
+        x = v[1]
+        y = v[2]
+        z = v[3]
+    end
+    if x == nil then
+        return nil
+    end
+    return tonumber(x) or 0, tonumber(y) or 0, tonumber(z) or 0
+end
+
+local function _GetArmForwardRight(arm)
+    if arm == nil then
+        return nil, nil
+    end
+    local ok1, fwd = pcall(function()
+        if arm.GetForwardVector then
+            return arm:GetForwardVector()
+        end
+        return arm.ForwardVector
+    end)
+    local ok2, rht = pcall(function()
+        if arm.GetRightVector then
+            return arm:GetRightVector()
+        end
+        return arm.RightVector
+    end)
+    if not ok1 then
+        fwd = nil
+    end
+    if not ok2 then
+        rht = nil
+    end
+    return fwd, rht
+end
+
+local function _MakeHorizontal(v)
+    local x, y, z = _ReadVec(v)
+    if x == nil then
+        return nil
+    end
+    z = 0
+    local len = math.sqrt((x * x) + (y * y))
+    if len > 1e-6 then
+        x = x / len
+        y = y / len
+    end
+    return _NewVector(x, y, z)
+end
+
+local function _ClampAxis(axis)
+    axis = tonumber(axis) or 0
+    if axis > 1 then
+        return 1
+    end
+    if axis < -1 then
+        return -1
+    end
+    return axis
+end
+
 local function _GetOrCreateState(pawn)
     pawn.__SwordFlyState = pawn.__SwordFlyState or {}
     local s = pawn.__SwordFlyState
@@ -116,6 +184,15 @@ local function _GetOrCreateState(pawn)
     end
     if s.vertHoldAxis == nil then
         s.vertHoldAxis = 0
+    end
+    if s.forwardAxis == nil then
+        s.forwardAxis = 0
+    end
+    if s.rightAxis == nil then
+        s.rightAxis = 0
+    end
+    if s.enterAutoLiftRemaining == nil then
+        s.enterAutoLiftRemaining = 0
     end
     return s
 end
@@ -203,8 +280,11 @@ function SwordFly.Enter(pawn)
     end
 
     state.enterBlendRemaining = tonumber(Config.EnterBlendTime) or 0
+    state.enterAutoLiftRemaining = tonumber(Config.EnterAutoLiftTime) or 0
     state.bFlying = true
     state.vertHoldAxis = 0
+    state.forwardAxis = 0
+    state.rightAxis = 0
 
     _ApplyCameraEnter(pawn, state)
 
@@ -267,7 +347,10 @@ function SwordFly.Exit(pawn)
 
     state.bFlying = false
     state.enterBlendRemaining = 0
+    state.enterAutoLiftRemaining = 0
     state.vertHoldAxis = 0
+    state.forwardAxis = 0
+    state.rightAxis = 0
 
     local pc = UGCGameSystem.GetPlayerControllerByPlayerPawn(pawn)
     if pc and pc.ClientRPC_Tip then
@@ -311,6 +394,35 @@ function SwordFly.Tick(pawn, dt)
         state.enterBlendRemaining = math.max(0, state.enterBlendRemaining - dt)
     end
 
+    -- 进入御剑后的轻抬升：按 V 后先向上“起一小下”，避免原地开始飞的突兀感
+    if state.enterAutoLiftRemaining ~= nil and state.enterAutoLiftRemaining > 0 and pawn.AddMovementInput then
+        local axis = tonumber(Config.EnterAutoLiftAxis) or 0
+        if axis > 0.01 then
+            pawn:AddMovementInput(_UpVector, _ClampAxis(axis), false)
+        end
+        state.enterAutoLiftRemaining = math.max(0, state.enterAutoLiftRemaining - dt)
+    end
+
+    -- “看向哪飞哪”的前进：W/S 使用相机 Forward（带 Pitch）
+    -- 左右平移：A/D 只使用水平 Right（不带 Pitch），避免侧移导致上下漂
+    local forwardAxis = _ClampAxis(state.forwardAxis)
+    local rightAxis = _ClampAxis(state.rightAxis)
+    if (math.abs(forwardAxis) > 0.01 or math.abs(rightAxis) > 0.01) and pawn.AddMovementInput then
+        local arm = _FindSpringArm(pawn)
+        local fwd, rht = _GetArmForwardRight(arm)
+        if fwd ~= nil and math.abs(forwardAxis) > 0.01 then
+            pawn:AddMovementInput(fwd, forwardAxis, false)
+        end
+        if rht ~= nil and math.abs(rightAxis) > 0.01 then
+            local horizRight = _MakeHorizontal(rht)
+            if horizRight ~= nil then
+                pawn:AddMovementInput(horizRight, rightAxis, false)
+            else
+                pawn:AddMovementInput(rht, rightAxis, false)
+            end
+        end
+    end
+
     local vert = state.vertHoldAxis or 0
     if math.abs(vert) > 0.01 and pawn.AddMovementInput then
         pawn:AddMovementInput(_UpVector, vert, false)
@@ -334,6 +446,35 @@ function SwordFly.SetVerticalHoldAxis(pawn, axis)
         axis = 0
     end
     state.vertHoldAxis = axis
+end
+
+function SwordFly.SetMoveAxis(pawn, forwardAxis, rightAxis)
+    if not _IsValid(pawn) then
+        return
+    end
+    local state = _GetOrCreateState(pawn)
+    state.forwardAxis = _ClampAxis(forwardAxis)
+    state.rightAxis = _ClampAxis(rightAxis)
+end
+
+function SwordFly.SetMoveForwardAxis(pawn, axis)
+    if not _IsValid(pawn) then
+        return
+    end
+    local state = _GetOrCreateState(pawn)
+    state.forwardAxis = _ClampAxis(axis)
+end
+
+function SwordFly.SetMoveRightAxis(pawn, axis)
+    if not _IsValid(pawn) then
+        return
+    end
+    local state = _GetOrCreateState(pawn)
+    state.rightAxis = _ClampAxis(axis)
+end
+
+function SwordFly.HasCameraArm(pawn)
+    return _IsValid(_FindSpringArm(pawn))
 end
 
 function SwordFly.IsFlying(pawn)
