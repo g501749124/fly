@@ -1,4 +1,5 @@
 ---@class small1_C:BP_UGC_GenericMobPawn_Base_C
+---@field HitBox UCapsuleComponent
 --Edit Below--
 local small1 = {}
 
