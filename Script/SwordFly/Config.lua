@@ -24,4 +24,11 @@ Config.SwordClassPath = "Asset/Sword/Sword.Sword_C"
 -- 进入御剑时镜头拉远（SpringArm.TargetArmLength 增量）
 Config.CameraArmLengthDelta = 260
 
+Config.OrbitSwordCount = 5
+Config.OrbitRadius = 150
+Config.OrbitHeight = 60
+Config.OrbitSpeedDeg = 120
+Config.OrbitSwordPitch = 0
+Config.OrbitSwordRoll = 90
+
 return Config
