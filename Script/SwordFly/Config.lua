@@ -28,7 +28,10 @@ Config.OrbitSwordCount = 5
 Config.OrbitRadius = 150
 Config.OrbitHeight = 60
 Config.OrbitSpeedDeg = 120
-Config.OrbitSwordPitch = 0
+Config.OrbitBackpackItemID = 8310001
+Config.OrbitBackpackRefreshInterval = 0.2
+Config.OrbitSwordScale = 1.0
+Config.OrbitSwordPitch = -90
 Config.OrbitSwordRoll = 90
 
 return Config

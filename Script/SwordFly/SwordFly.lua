@@ -234,6 +234,12 @@ local function _GetOrCreateState(pawn)
     if s.enterAutoLiftRemaining == nil then
         s.enterAutoLiftRemaining = 0
     end
+    if s.orbitVisibleCount == nil then
+        s.orbitVisibleCount = 0
+    end
+    if s.orbitRefreshRemaining == nil then
+        s.orbitRefreshRemaining = 0
+    end
     return s
 end
 
@@ -293,6 +299,76 @@ local function _DestroyOrbitSwords(state)
     state.orbitAngle = 0
 end
 
+local function _RefreshOrbitSwordVisibleCount(pawn, state, dt, maxCount)
+    if state == nil then
+        return 0
+    end
+    maxCount = math.max(0, math.floor(tonumber(maxCount) or 0))
+    state.orbitRefreshRemaining = (tonumber(state.orbitRefreshRemaining) or 0) - (tonumber(dt) or 0)
+    if state.orbitVisibleCount ~= nil and state.orbitRefreshRemaining > 0 then
+        return math.max(0, math.min(maxCount, math.floor(tonumber(state.orbitVisibleCount) or 0)))
+    end
+
+    state.orbitRefreshRemaining = tonumber(Config.OrbitBackpackRefreshInterval) or 0.2
+
+    local itemID = tonumber(Config.OrbitBackpackItemID) or 0
+    if itemID <= 0 or UGCBackpackSystemV2 == nil or UGCBackpackSystemV2.GetItemCountV2 == nil then
+        state.orbitVisibleCount = maxCount
+        return maxCount
+    end
+
+    local player = UGCGameSystem.GetPlayerControllerByPlayerPawn and UGCGameSystem.GetPlayerControllerByPlayerPawn(pawn) or pawn
+    if player == nil then
+        player = pawn
+    end
+
+    local ok, itemCount = pcall(function()
+        return UGCBackpackSystemV2.GetItemCountV2(player, itemID)
+    end)
+    if not ok then
+        itemCount = 0
+    end
+
+    local equippedCount = 0
+    if UGCBackpackSystemV2.GetItemDefineIDsByIDV2 ~= nil and UGCBackpackSystemV2.GetItemEquippingSlot ~= nil then
+        local okIDs, defineIDs = pcall(function()
+            return UGCBackpackSystemV2.GetItemDefineIDsByIDV2(player, itemID)
+        end)
+        if okIDs and type(defineIDs) == "table" then
+            for _, defineID in ipairs(defineIDs) do
+                local okSlot, slotName = pcall(function()
+                    return UGCBackpackSystemV2.GetItemEquippingSlot(player, defineID)
+                end)
+                if okSlot and slotName ~= nil and tostring(slotName) ~= "" then
+                    equippedCount = equippedCount + 1
+                end
+            end
+        end
+    end
+
+    local currentWeaponCount = 0
+    if UGCWeaponManagerSystem ~= nil
+        and UGCWeaponManagerSystem.GetCurrentWeapon ~= nil
+        and UGCWeaponManagerSystem.GetWeaponItemID ~= nil then
+        local okWeapon, currentWeapon = pcall(function()
+            return UGCWeaponManagerSystem.GetCurrentWeapon(pawn)
+        end)
+        if okWeapon and currentWeapon ~= nil then
+            local okWeaponID, currentWeaponItemID = pcall(function()
+                return UGCWeaponManagerSystem.GetWeaponItemID(currentWeapon)
+            end)
+            if okWeaponID and tonumber(currentWeaponItemID) == itemID then
+                currentWeaponCount = 1
+            end
+        end
+    end
+
+    local excludeCount = math.max(equippedCount, currentWeaponCount)
+    local visibleCount = (tonumber(itemCount) or 0) - excludeCount
+    state.orbitVisibleCount = math.max(0, math.min(maxCount, math.floor(visibleCount)))
+    return state.orbitVisibleCount
+end
+
 local function _EnsureOrbitSwords(pawn, state)
     if state == nil then
         return
@@ -317,6 +393,8 @@ local function _EnsureOrbitSwords(pawn, state)
     end
 
     local count = math.max(1, math.floor(tonumber(Config.OrbitSwordCount) or 1))
+    local scaleValue = tonumber(Config.OrbitSwordScale) or 1
+    local scale = { X = scaleValue, Y = scaleValue, Z = scaleValue }
     local list = {}
     for _ = 1, count do
         local ok, a = pcall(function()
@@ -325,8 +403,11 @@ local function _EnsureOrbitSwords(pawn, state)
         if ok and _IsValid(a) then
             pcall(function()
                 a:SetActorEnableCollision(false)
-                a:SetActorHiddenInGame(false)
+                a:SetActorHiddenInGame(true)
                 a:K2_AttachToComponent(mesh, "")
+                if a.SetActorRelativeScale3D then
+                    a:SetActorRelativeScale3D(scale)
+                end
             end)
             table.insert(list, a)
         end
@@ -348,12 +429,14 @@ local function _UpdateOrbitSwords(pawn, state, dt)
     local radius = tonumber(Config.OrbitRadius) or 0
     local height = tonumber(Config.OrbitHeight) or 0
     local speed = tonumber(Config.OrbitSpeedDeg) or 0
+    local scaleValue = tonumber(Config.OrbitSwordScale) or 1
     local pitch = tonumber(Config.OrbitSwordPitch) or 0
     local roll = tonumber(Config.OrbitSwordRoll) or 0
 
     state.orbitAngle = (tonumber(state.orbitAngle) or 0) + speed * (tonumber(dt) or 0)
     local base = tonumber(state.orbitAngle) or 0
     local count = #state.orbitSwords
+    local visibleCount = _RefreshOrbitSwordVisibleCount(pawn, state, dt, count)
     local step = 360 / math.max(1, count)
 
     for i = 1, count do
@@ -364,11 +447,15 @@ local function _UpdateOrbitSwords(pawn, state, dt)
             local loc = { X = math.cos(rad) * radius, Y = math.sin(rad) * radius, Z = height }
             local rot = { Pitch = pitch, Yaw = deg, Roll = roll }
             pcall(function()
+                a:SetActorHiddenInGame(i > visibleCount)
                 if a.K2_SetActorRelativeLocation then
                     a:K2_SetActorRelativeLocation(loc, false, nil, false)
                 end
                 if a.K2_SetActorRelativeRotation then
                     a:K2_SetActorRelativeRotation(rot, false, nil, false)
+                end
+                if a.SetActorRelativeScale3D then
+                    a:SetActorRelativeScale3D({ X = scaleValue, Y = scaleValue, Z = scaleValue })
                 end
             end)
         end
@@ -431,6 +518,8 @@ function SwordFly.Enter(pawn)
     state.forwardAxis = 0
     state.rightAxis = 0
     state.animFreezePending = true
+    state.orbitVisibleCount = 0
+    state.orbitRefreshRemaining = 0
 
     _ApplyCameraEnter(pawn, state)
 
