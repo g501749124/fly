@@ -81,7 +81,7 @@ LastTargetPlatform=LinuxServer
 
 [UGCUploadOption]
 PlatformIndex=0
-SkipBake=False
+SkipBake=True
 TargetPlatform=LinuxServer+WindowsNoEditor+Android_ETC2+IOS+OpenHarmony_ETC2
 
 [DebugSettings]
